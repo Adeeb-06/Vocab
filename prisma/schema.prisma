@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  firebaseUid String   @unique
+  name        String
+  email       String   @unique
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("users")
+}
+
+
+model Word {
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  word           String        @unique
+  normalizedWord String        @unique
+  ipa            String?
+  audioUrl       String?
+  senses         WordSense[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model WordSense {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  wordId       String        @db.ObjectId
+  partOfSpeech String
+  meaningEn    String
+  meaningBn    String
+  word         Word          @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  examples     WordExample[]
+  createdAt    DateTime      @default(now())
+
+  @@index([wordId])
+}
+
+model WordExample {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  senseId       String    @db.ObjectId
+  sentence      String
+  translationBn String?
+  sense         WordSense @relation(fields: [senseId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+
+  @@index([senseId])
+}
