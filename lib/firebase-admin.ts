@@ -1,4 +1,3 @@
-
 import "server-only";
 
 import {
@@ -6,37 +5,42 @@ import {
   getApp,
   getApps,
   initializeApp,
+  type ServiceAccount,
 } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
-const projectId = process.env.FIREBASE_PROJECT_ID;
-const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+const fbServiceKey = process.env.FB_SERVICE_KEY;
 
-if (!projectId || !clientEmail || !privateKey) {
-  throw new Error("Missing Firebase Admin environment variables.");
+console.log("=== FB_SERVICE_KEY DEBUG ===");
+console.log("Exists:", !!fbServiceKey);
+console.log("Type:", typeof fbServiceKey);
+console.log("Length:", fbServiceKey?.length);
+console.log("First 80 chars:", fbServiceKey?.slice(0, 80));
+console.log("Last 80 chars:", fbServiceKey?.slice(-80));
+console.log("Contains spaces?", fbServiceKey?.includes(" "));
+console.log("Contains newlines?", fbServiceKey?.includes("\n"));
+console.log("============================");
+
+if (!fbServiceKey) {
+  throw new Error("Missing FB_SERVICE_KEY environment variable");
+}
+
+let serviceAccount: ServiceAccount;
+
+try {
+  const decoded = Buffer.from(fbServiceKey, "base64").toString("utf8");
+  console.log("Decoded starts with:", decoded.slice(0, 50));
+  serviceAccount = JSON.parse(decoded) as ServiceAccount;
+} catch (err) {
+  console.error("Failed to decode FB_SERVICE_KEY:", err);
+  throw new Error("FB_SERVICE_KEY is not a valid base64-encoded service account JSON");
 }
 
 const adminApp =
   getApps().length > 0
     ? getApp()
     : initializeApp({
-        credential: cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-        projectId,
+        credential: cert(serviceAccount),
       });
-console.log("Firebase Admin credential check:", {
-  projectId,
-  clientEmail,
-  hasPrivateKey: Boolean(privateKey),
-  validPrivateKeyStart: privateKey?.startsWith(
-    "-----BEGIN PRIVATE KEY-----"
-  ),
-  validPrivateKeyEnd: privateKey?.trim().endsWith(
-    "-----END PRIVATE KEY-----"
-  ),
-});
+
 export const adminAuth = getAuth(adminApp);

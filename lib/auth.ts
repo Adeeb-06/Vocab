@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { prisma } from "@/lib/prisma";
 
+const SESSION_COOKIE_NAME = "__session";
+
 type AppUser = NonNullable<
   Awaited<ReturnType<typeof prisma.user.findUnique>>
 >;
@@ -13,48 +15,64 @@ type AuthResult =
 export async function requireAuth(
   request: NextRequest
 ): Promise<AuthResult> {
-  const authorization = request.headers.get("authorization");
+  let decoded: { uid: string };
 
-  if (!authorization?.startsWith("Bearer ")) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Authentication required." },
-        { status: 401 }
-      ),
-    };
-  }
+  // 1. Prefer the HTTP-only session cookie (what the browser actually sends)
+  const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
-  const idToken = authorization.slice(7).trim();
+  if (sessionCookie) {
+    try {
+      decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    } catch {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: "Invalid or expired session." },
+          { status: 401 }
+        ),
+      };
+    }
+  } else {
+    // 2. Fallback to Bearer ID token (useful for mobile / external clients)
+    const authorization = request.headers.get("authorization");
 
-  if (!idToken || idToken.length > 10_000) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Invalid authentication token." },
-        { status: 401 }
-      ),
-    };
-  }
+    if (!authorization?.startsWith("Bearer ")) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: "Authentication required." },
+          { status: 401 }
+        ),
+      };
+    }
 
-  let decoded;
+    const idToken = authorization.slice(7).trim();
 
-  try {
-    decoded = await adminAuth.verifyIdToken(idToken);
-  } catch {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Invalid or expired session." },
-        { status: 401 }
-      ),
-    };
+    if (!idToken || idToken.length > 10_000) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: "Invalid authentication token." },
+          { status: 401 }
+        ),
+      };
+    }
+
+    try {
+      decoded = await adminAuth.verifyIdToken(idToken);
+    } catch {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: "Invalid or expired session." },
+          { status: 401 }
+        ),
+      };
+    }
   }
 
   const user = await prisma.user.findUnique({
-    where: {
-      firebaseUid: decoded.uid,
-    },
+    where: { firebaseUid: decoded.uid },
   });
 
   if (!user) {
@@ -91,4 +109,11 @@ export async function requireRole(
   }
 
   return auth;
+}
+
+export async function requireApiRole(
+  request: NextRequest,
+  allowedRole: "admin" | "user"
+): Promise<AuthResult> {
+  return requireRole(request, allowedRole);
 }
