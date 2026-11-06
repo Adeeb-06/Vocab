@@ -28,5 +28,15 @@ const adminApp =
         }),
         projectId,
       });
-
+console.log("Firebase Admin credential check:", {
+  projectId,
+  clientEmail,
+  hasPrivateKey: Boolean(privateKey),
+  validPrivateKeyStart: privateKey?.startsWith(
+    "-----BEGIN PRIVATE KEY-----"
+  ),
+  validPrivateKeyEnd: privateKey?.trim().endsWith(
+    "-----END PRIVATE KEY-----"
+  ),
+});
 export const adminAuth = getAuth(adminApp);

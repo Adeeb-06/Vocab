@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  user
+  admin
+}
 
 model User {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -14,6 +18,9 @@ model User {
   name        String
   email       String   @unique
   image       String?
+
+  role        UserRole @default(user)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -22,25 +29,52 @@ model User {
 
 
 model Word {
-  id             String        @id @default(auto()) @map("_id") @db.ObjectId
-  word           String        @unique
-  normalizedWord String        @unique
+  id             String           @id @default(auto()) @map("_id") @db.ObjectId
+  word           String           @unique
+
+  // Pronunciation
   ipa            String?
   audioUrl       String?
+
+  // Word metadata
+  difficulty     Int?             // 1 = Easy, 5 = Difficult
+  sources        String[]         @default([])
+
+  // Content management
+  isVerified     Boolean          @default(false)
+  isActive       Boolean          @default(true)
+
+  // Relations
   senses         WordSense[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  listItems      WordListItem[]
+  clozes WordCloze[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([isActive])
+
 }
 
 model WordSense {
   id           String        @id @default(auto()) @map("_id") @db.ObjectId
   wordId       String        @db.ObjectId
+
+  // Meaning
   partOfSpeech String
   meaningEn    String
   meaningBn    String
+
+  // Vocabulary learning data
+  synonyms     String[]      @default([])
+  antonyms     String[]      @default([])
+  collocations String[]      @default([])
+  clozes WordCloze[]
+  // Relations
   word         Word          @relation(fields: [wordId], references: [id], onDelete: Cascade)
   examples     WordExample[]
+
   createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@index([wordId])
 }
@@ -48,10 +82,101 @@ model WordSense {
 model WordExample {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   senseId       String    @db.ObjectId
+
   sentence      String
-  translationBn String?
+
+  // Optional cloze version for quizzes
+  clozes WordCloze[]
+
   sense         WordSense @relation(fields: [senseId], references: [id], onDelete: Cascade)
+
   createdAt     DateTime  @default(now())
 
   @@index([senseId])
+}
+
+model WordList {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  slug        String           @unique
+  description String?
+
+  items       WordListItem[]
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model WordListItem {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  wordListId  String   @db.ObjectId
+  wordId      String   @db.ObjectId
+
+  // Curriculum organization
+  order       Int
+  dayNumber   Int?
+
+  // Access control
+  isFree      Boolean  @default(true)
+
+  wordList    WordList @relation(fields: [wordListId], references: [id], onDelete: Cascade)
+  word        Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([wordListId, wordId])
+  @@unique([wordListId, order])
+  @@index([wordId])
+  @@index([wordListId, dayNumber])
+}
+
+
+
+
+enum ClozePattern {
+  sentence_blank
+  meaning_blank
+  first_letter
+  multiple_choice
+  collocation_blank
+  synonym_blank
+}
+
+model WordCloze {
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Relations
+  wordId          String       @db.ObjectId
+  senseId         String       @db.ObjectId
+  exampleId       String?      @db.ObjectId
+
+  word            Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  sense           WordSense    @relation(fields: [senseId], references: [id], onDelete: Cascade)
+  example         WordExample? @relation(fields: [exampleId], references: [id], onDelete: SetNull)
+
+  // Question information
+  pattern         ClozePattern
+  prompt          String
+  answerText      String
+  acceptedAnswers String[]     @default([])
+
+  // Pattern-specific configuration
+  config          Json?
+
+  // Additional information
+  explanation     String?
+  difficultyLevel Int          @default(1) // 1 = Easy, 5 = Difficult
+
+  // Content management
+  isVerified      Boolean      @default(false)
+  isActive        Boolean      @default(true)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([wordId])
+  @@index([senseId])
+  @@index([exampleId])
+  @@index([pattern, isActive, isVerified])
+  @@index([senseId, pattern])
 }

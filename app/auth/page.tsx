@@ -91,6 +91,30 @@ export default function AuthPage() {
     }
   }
 
+  async function createUserSession(firebaseUser: FirebaseUser) {
+    // Get a fresh Firebase ID token.
+    const idToken = await firebaseUser.getIdToken(true);
+
+    const response = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ idToken }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Could not create your session.");
+    }
+
+    if (result.role !== "admin" && result.role !== "user") {
+      throw new Error("Your account has an invalid role.");
+    }
+
+    return result.role as "admin" | "user";
+  }
   async function onSubmit(data: AuthFormValues) {
     setMessage("");
 
@@ -124,7 +148,10 @@ export default function AuthPage() {
         mode === "signup" ? data.name?.trim() : undefined,
       );
 
-      router.push("/dashboard");
+      const role = await createUserSession(firebaseUser);
+
+      router.replace(role === "admin" ? "/admin/dashboard" : "/dashboard");
+
       router.refresh();
     } catch (error) {
       console.error("Authentication failed:", error);
@@ -142,7 +169,10 @@ export default function AuthPage() {
 
       await syncUserProfile(credential.user);
 
-      router.push("/dashboard");
+      const role = await createUserSession(credential.user);
+
+      router.replace(role === "admin" ? "/admin/dashboard" : "/dashboard");
+
       router.refresh();
     } catch (error) {
       console.error("Google sign-in failed:", error);
