@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "app/api/admin/words/clozes/create-clozes"  ],
   "exclude": ["node_modules"]
 }

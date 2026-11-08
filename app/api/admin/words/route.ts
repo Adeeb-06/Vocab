@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
           senses: {
             take: 1,
             select: {
+              id:true,
               partOfSpeech: true,
               meaningEn: true,
               meaningBn: true,

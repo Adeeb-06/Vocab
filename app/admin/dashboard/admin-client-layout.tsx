@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  onAuthStateChanged,
-  signOut,
-  type User,
-} from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 
 import { auth } from "@/lib/firebase";
 import DashboardSidebar from "@/components/dashbaord/dashboard-sidebar";
+import { FiGrid } from "react-icons/fi";
+import { LiaWordpressSimple } from "react-icons/lia";
+import { PiExamFill } from "react-icons/pi";
+import { ListChecks } from "lucide-react";
 
 export default function AdminClientLayout({
   children,
@@ -61,8 +61,26 @@ export default function AdminClientLayout({
   const displayName = user.displayName || "Admin";
 
   const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    displayName
+    displayName,
   )}&background=eeeef2&color=27272a`;
+
+  const links = [
+    {
+      label: "Dashboard",
+      href: "/dashboard",
+      icon: FiGrid,
+    },
+    {
+      label: "Words Review",
+      href: "/admin/dashboard/words",
+      icon: ListChecks,
+    },
+    {
+      label: "Clozes Review",
+      href: "/admin/dashboard/clozes",
+      icon: ListChecks,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#f8f8fa] text-zinc-900">
@@ -71,9 +89,10 @@ export default function AdminClientLayout({
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onLogout={handleLogout}
+        links={links}
       />
 
-      <div className="min-h-screen lg:pl-[248px]">
+      <div className="min-h-screen lg:pl-[200px]">
         <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-zinc-200/70 bg-white/90 px-5 backdrop-blur-xl sm:px-8">
           <div className="flex items-center gap-3">
             <button
@@ -109,7 +128,7 @@ export default function AdminClientLayout({
           />
         </header>
 
-        <main className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-12 lg:px-10">
+        <main className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-12 lg:px-1">
           {children}
         </main>
       </div>

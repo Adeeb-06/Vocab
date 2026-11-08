@@ -11,32 +11,27 @@ import {
   FiLogOut,
   FiX,
 } from "react-icons/fi";
+import { JSXElementConstructor } from "react";
 
 interface DashboardSidebarProps {
   user: User;
   isOpen: boolean;
   onClose: () => void;
-  onLogout: () => void;
+  onLogout: () => void;  links: {
+    label: string;
+    href: string;
+    icon: any;
+  }[];
+
 }
 
-const navigationLinks = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: FiGrid,
-  },
-  {
-    label: "Learn",
-    href: "/dashboard/learn",
-    icon: FiBookOpen,
-  },
-];
 
 export default function DashboardSidebar({
   user,
   isOpen,
   onClose,
   onLogout,
+  links
 }: DashboardSidebarProps) {
   const pathname = usePathname();
 
@@ -92,7 +87,7 @@ export default function DashboardSidebar({
           </p>
 
           <div className="space-y-1">
-            {navigationLinks.map((item) => {
+            {links.map((item) => {
               const Icon = item.icon;
 
               const isActive =

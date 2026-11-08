@@ -7,6 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import EditWordMeaningModal from "./EditWordMeaningModal";
 
 type Word = {
   id: string;
@@ -16,12 +17,12 @@ type Word = {
   isActive: boolean;
   createdAt: string;
   senses: {
+    id: string;
     partOfSpeech: string;
     meaningEn: string;
     meaningBn: string;
   }[];
 };
-
 type WordsResponse = {
   words: Word[];
   pagination: {
@@ -76,9 +77,59 @@ async function updateVerification(wordId: string, isVerified: boolean) {
   return response.json();
 }
 
+async function updateWordMeaning({
+  wordId,
+  senseId,
+  meaningEn,
+  meaningBn,
+}: {
+  wordId: string;
+  senseId: string;
+  meaningEn: string;
+  meaningBn: string;
+}) {
+  const response = await fetch("/api/admin/words/meaning", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      wordId,
+      senseId,
+      meaningEn,
+      meaningBn,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || "Could not update meanings.");
+  }
+
+  return data;
+}
+
 export default function WordsTable() {
   const queryClient = useQueryClient();
   const [copiedWordId, setCopiedWordId] = useState<string | null>(null);
+
+  const [editing, setEditing] = useState<{
+    word: Word;
+    sense: Word["senses"][number];
+  } | null>(null);
+
+  const meaningMutation = useMutation({
+    mutationFn: updateWordMeaning,
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["admin-words"],
+      });
+
+      setEditing(null);
+    },
+  });
 
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>({
@@ -312,9 +363,23 @@ export default function WordsTable() {
                         <p className="truncate text-gray-700">
                           {sense?.meaningEn || "No meaning added"}
                         </p>
+
                         <p className="mt-1 truncate text-xs text-gray-500">
                           {sense?.meaningBn || "—"}
                         </p>
+
+                        {sense && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditing({ word, sense });
+                              meaningMutation.reset();
+                            }}
+                            className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800"
+                          >
+                            Edit meaning
+                          </button>
+                        )}
                       </td>
 
                       <td className="px-5 py-4 text-gray-600">
@@ -394,6 +459,28 @@ export default function WordsTable() {
           </div>
         )}
       </div>
+      {editing && (
+        <EditWordMeaningModal
+          key={editing.sense.id}
+          word={editing.word.word}
+          meaningEn={editing.sense.meaningEn}
+          meaningBn={editing.sense.meaningBn}
+          isSaving={meaningMutation.isPending}
+          error={meaningMutation.error?.message}
+          onClose={() => {
+            setEditing(null);
+            meaningMutation.reset();
+          }}
+          onSave={(meaningEn, meaningBn) => {
+            meaningMutation.mutate({
+              wordId: editing.word.id,
+              senseId: editing.sense.id,
+              meaningEn,
+              meaningBn,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
