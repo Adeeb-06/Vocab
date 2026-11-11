@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/auth";
@@ -16,12 +15,15 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, Number(params.get("page")) || 1);
     const pageSize = Math.min(
       MAX_PAGE_SIZE,
-      Math.max(1, Number(params.get("pageSize")) || 20)
+      Math.max(1, Number(params.get("pageSize")) || 20),
     );
 
     const where = {
       isVerified: true,
       isActive: true,
+      listItems: {
+        none: {},
+      },
       ...(search
         ? {
             word: {
@@ -75,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { message: "Could not load verified words." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
