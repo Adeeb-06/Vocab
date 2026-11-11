@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,126 +13,22 @@ enum UserRole {
   admin
 }
 
-model User {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  firebaseUid String   @unique
-  name        String
-  email       String   @unique
-  image       String?
-
-  role        UserRole @default(user)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("users")
+enum LessonStatus {
+  DRAFT
+  PUBLISHED
 }
 
-
-model Word {
-  id             String           @id @default(auto()) @map("_id") @db.ObjectId
-  word           String           @unique
-
-  // Pronunciation
-  ipa            String?
-  audioUrl       String?
-
-  // Word metadata
-  difficulty     Int?             // 1 = Easy, 5 = Difficult
-  sources        String[]         @default([])
-
-  // Content management
-  isVerified     Boolean          @default(false)
-  isActive       Boolean          @default(true)
-
-  // Relations
-  senses         WordSense[]
-  listItems      WordListItem[]
-  clozes WordCloze[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-
-  @@index([isActive])
-
+enum ProgramStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
 }
 
-model WordSense {
-  id           String        @id @default(auto()) @map("_id") @db.ObjectId
-  wordId       String        @db.ObjectId
-
-  // Meaning
-  partOfSpeech String
-  meaningEn    String
-  meaningBn    String
-
-  // Vocabulary learning data
-  synonyms     String[]      @default([])
-  antonyms     String[]      @default([])
-  collocations String[]      @default([])
-  clozes WordCloze[]
-  // Relations
-  word         Word          @relation(fields: [wordId], references: [id], onDelete: Cascade)
-  examples     WordExample[]
-
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  @@index([wordId])
+enum LessonProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
 }
-
-model WordExample {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  senseId       String    @db.ObjectId
-
-  sentence      String
-
-  // Optional cloze version for quizzes
-  clozes WordCloze[]
-
-  sense         WordSense @relation(fields: [senseId], references: [id], onDelete: Cascade)
-
-  createdAt     DateTime  @default(now())
-
-  @@index([senseId])
-}
-
-model WordList {
-  id          String           @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  slug        String           @unique
-  description String?
-
-  items       WordListItem[]
-
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-}
-
-model WordListItem {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  wordListId  String   @db.ObjectId
-  wordId      String   @db.ObjectId
-
-  // Curriculum organization
-  order       Int
-  dayNumber   Int?
-
-  // Access control
-  isFree      Boolean  @default(true)
-
-  wordList    WordList @relation(fields: [wordListId], references: [id], onDelete: Cascade)
-  word        Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
-
-  createdAt   DateTime @default(now())
-
-  @@unique([wordListId, wordId])
-  @@unique([wordListId, order])
-  @@index([wordId])
-  @@index([wordListId, dayNumber])
-}
-
-
-
 
 enum ClozePattern {
   sentence_blank
@@ -142,37 +39,252 @@ enum ClozePattern {
   synonym_blank
 }
 
-model WordCloze {
-  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+model User {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  firebaseUid String   @unique
+  name        String
+  email       String   @unique
+  image       String?
+
+  role        UserRole @default(user)
+
+  // Learning relations
+  programs       UserProgram[]
+  lessonProgress UserLessonProgress[]
+  wordProgress   UserWordProgress[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Word {
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  word       String  @unique
+
+  // Pronunciation
+  ipa        String?
+  audioUrl   String?
+
+  // Word metadata
+  difficulty Int?
+  sources    String[] @default([])
+
+  // Content management
+  isVerified Boolean @default(false)
+  isActive   Boolean @default(true)
 
   // Relations
-  wordId          String       @db.ObjectId
-  senseId         String       @db.ObjectId
-  exampleId       String?      @db.ObjectId
+  senses       WordSense[]
+  listItems    WordListItem[]
+  clozes       WordCloze[]
+  userProgress UserWordProgress[]
 
-  word            Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
-  sense           WordSense    @relation(fields: [senseId], references: [id], onDelete: Cascade)
-  example         WordExample? @relation(fields: [exampleId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model WordSense {
+  id           String @id @default(auto()) @map("_id") @db.ObjectId
+  wordId       String @db.ObjectId
+
+  // Meaning
+  partOfSpeech String
+  meaningEn    String
+  meaningBn    String
+
+  // Vocabulary learning data
+  synonyms     String[] @default([])
+  antonyms     String[] @default([])
+  collocations String[] @default([])
+
+  // Relations
+  word     Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  examples WordExample[]
+  clozes   WordCloze[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([wordId])
+}
+
+model WordExample {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  senseId  String @db.ObjectId
+
+  sentence String
+
+  // Relations
+  sense  WordSense   @relation(fields: [senseId], references: [id], onDelete: Cascade)
+  clozes WordCloze[]
+
+  createdAt DateTime @default(now())
+
+  @@index([senseId])
+}
+
+model WordList {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  slug        String  @unique
+  description String?
+
+  items    WordListItem[]
+  lessons  Lesson[]
+  programs UserProgram[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lesson {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  wordListId   String       @db.ObjectId
+
+  lessonNumber Int
+  title        String
+  description  String?
+
+  status       LessonStatus @default(DRAFT)
+  releaseAt    DateTime?
+
+  wordList WordList             @relation(fields: [wordListId], references: [id], onDelete: Cascade)
+  items    WordListItem[]
+  progress UserLessonProgress[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([wordListId, lessonNumber])
+  @@index([wordListId, status, releaseAt])
+}
+
+model WordListItem {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  wordListId String @db.ObjectId
+  wordId     String @db.ObjectId
+
+  // Curriculum organization
+  order       Int
+  dayNumber   Int? // Legacy field; remove after migrating old code
+  lessonId    String? @db.ObjectId
+  lessonOrder Int?
+
+  // Access control
+  isFree Boolean @default(true)
+
+  wordList WordList @relation(fields: [wordListId], references: [id], onDelete: Cascade)
+  word     Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  lesson   Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([wordListId, wordId])
+  @@unique([wordListId, order])
+  @@index([wordId])
+  @@index([wordListId, dayNumber])
+  @@index([lessonId])
+}
+
+model UserProgram {
+  id         String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String        @db.ObjectId
+  wordListId String        @db.ObjectId
+
+  status      ProgramStatus @default(ACTIVE)
+  startedAt   DateTime      @default(now())
+  completedAt DateTime?
+
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordList WordList              @relation(fields: [wordListId], references: [id], onDelete: Cascade)
+  lessons  UserLessonProgress[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, wordListId])
+  @@index([userId, status])
+}
+
+model UserLessonProgress {
+  id        String               @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String               @db.ObjectId
+  programId String               @db.ObjectId
+  lessonId  String               @db.ObjectId
+
+  status      LessonProgressStatus @default(NOT_STARTED)
+  score       Float?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program UserProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  lesson  Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, lessonId])
+  @@index([programId, status])
+}
+
+model UserWordProgress {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  wordId String @db.ObjectId
+
+  box           Int      @default(1)
+  nextReviewAt  DateTime
+  introducedAt  DateTime @default(now())
+  lastReviewedAt DateTime?
+  lapses        Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, wordId])
+  @@index([userId, nextReviewAt])
+  @@index([wordId])
+}
+
+model WordCloze {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Relations
+  wordId    String  @db.ObjectId
+  senseId   String  @db.ObjectId
+  exampleId String? @db.ObjectId
+
+  word    Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  sense   WordSense    @relation(fields: [senseId], references: [id], onDelete: Cascade)
+  example WordExample? @relation(fields: [exampleId], references: [id], onDelete: SetNull)
 
   // Question information
   pattern         ClozePattern
   prompt          String
   answerText      String
-  acceptedAnswers String[]     @default([])
+  acceptedAnswers String[] @default([])
 
   // Pattern-specific configuration
-  config          Json?
+  config Json?
 
   // Additional information
   explanation     String?
-  difficultyLevel Int          @default(1) // 1 = Easy, 5 = Difficult
+  difficultyLevel Int     @default(1)
 
   // Content management
-  isVerified      Boolean      @default(false)
-  isActive        Boolean      @default(true)
+  isVerified Boolean @default(false)
+  isActive   Boolean @default(true)
 
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([wordId])
   @@index([senseId])

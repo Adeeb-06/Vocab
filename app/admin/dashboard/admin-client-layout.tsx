@@ -6,7 +6,7 @@ import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 
 import { auth } from "@/lib/firebase";
 import DashboardSidebar from "@/components/dashbaord/dashboard-sidebar";
-import { FiGrid } from "react-icons/fi";
+import { FiBookOpen, FiCheckSquare, FiGrid, FiLayers, FiList } from "react-icons/fi";
 import { LiaWordpressSimple } from "react-icons/lia";
 import { PiExamFill } from "react-icons/pi";
 import { ListChecks } from "lucide-react";
@@ -64,23 +64,33 @@ export default function AdminClientLayout({
     displayName,
   )}&background=eeeef2&color=27272a`;
 
-  const links = [
-    {
-      label: "Dashboard",
-      href: "/dashboard",
-      icon: FiGrid,
-    },
-    {
-      label: "Words Review",
-      href: "/admin/dashboard/words",
-      icon: ListChecks,
-    },
-    {
-      label: "Clozes Review",
-      href: "/admin/dashboard/clozes",
-      icon: ListChecks,
-    },
-  ];
+ const links = [
+  {
+    label: "Dashboard",
+    href: "/admin/dashboard",
+    icon: FiGrid,
+  },
+  {
+    label: "Words Review",
+    href: "/admin/dashboard/words",
+    icon: FiCheckSquare,
+  },
+  {
+    label: "Clozes Review",
+    href: "/admin/dashboard/clozes",
+    icon: FiList,
+  },
+  {
+    label: "Word Lists",
+    href: "/admin/dashboard/word-lists/create",
+    icon: FiLayers,
+  },
+  {
+    label: "Create Lesson",
+    href: "/admin/dashboard/lesson/create",
+    icon: FiBookOpen,
+  },
+];
 
   return (
     <div className="min-h-screen bg-[#f8f8fa] text-zinc-900">
