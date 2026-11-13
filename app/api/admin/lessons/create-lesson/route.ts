@@ -10,7 +10,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { wordListId } = body;
+    const { wordListId, title } = body;
+
+    if (
+      typeof title !== "string" ||
+      !title.trim() ||
+      title.trim().length > 80
+    ) {
+      return NextResponse.json(
+        {
+          message: "Please enter a valid lesson name (maximum 80 characters).",
+        },
+        { status: 400 },
+      );
+    }
 
     if (typeof wordListId !== "string" || !/^[a-f\d]{24}$/i.test(wordListId)) {
       return NextResponse.json(
@@ -54,12 +67,30 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log("LESSON CREATION DEBUG:", {
-      wordListId,
-      totalItems,
-      unassignedItems,
-      verifiedActiveItems,
+    const debugItems = await prisma.wordListItem.findMany({
+      where: { wordListId },
+      select: {
+        id: true,
+        lessonId: true,
+        word: {
+          select: {
+            word: true,
+            isVerified: true,
+            isActive: true,
+          },
+        },
+      },
     });
+
+    console.log(
+      "WORD VERIFICATION DEBUG:",
+      debugItems.map((item) => ({
+        word: item.word.word,
+        lessonId: item.lessonId,
+        isVerified: item.word.isVerified,
+        isActive: item.word.isActive,
+      })),
+    );
 
     const lesson = await prisma.$transaction(async (tx) => {
       const lastLesson = await tx.lesson.findFirst({
@@ -74,12 +105,6 @@ export async function POST(request: NextRequest) {
       const allItems = await tx.wordListItem.findMany({
         where: {
           wordListId,
-          word: {
-            is: {
-              isVerified: true,
-              isActive: true,
-            },
-          },
         },
         orderBy: {
           order: "asc",
@@ -91,14 +116,28 @@ export async function POST(request: NextRequest) {
           word: {
             select: {
               word: true,
+              isVerified: true,
+              isActive: true,
             },
           },
         },
       });
 
       const availableItems = allItems
-        .filter((item) => !item.lessonId)
+        .filter(
+          (item) =>
+            item.lessonId === null &&
+            item.word.isVerified &&
+            item.word.isActive,
+        )
         .slice(0, WORDS_PER_LESSON);
+
+      console.log("AVAILABLE WORDS:", availableItems.length);
+
+      if (availableItems.length < WORDS_PER_LESSON) {
+        throw new Error(`NOT_ENOUGH_WORDS:${availableItems.length}`);
+      }
+
       if (availableItems.length < WORDS_PER_LESSON) {
         throw new Error(`NOT_ENOUGH_WORDS:${availableItems.length}`);
       }
@@ -107,28 +146,54 @@ export async function POST(request: NextRequest) {
         data: {
           wordListId,
           lessonNumber,
-          title: `Lesson ${lessonNumber}`,
-          status: "DRAFT",
+          title: title.trim(),
+          status: "PUBLISHED",
         },
       });
-
-      // Assign the selected words to this lesson.
       for (const [index, item] of availableItems.entries()) {
-        const result = await tx.wordListItem.updateMany({
-          where: {
-            id: item.id,
-            lessonId: null,
+        // Recheck the item inside the transaction.
+        const currentItem = await tx.wordListItem.findUnique({
+          where: { id: item.id },
+          select: {
+            id: true,
+            lessonId: true,
           },
+        });
+
+        if (!currentItem) {
+          throw new Error(`WORD_NOT_FOUND:${item.id}`);
+        }
+
+        if (currentItem.lessonId !== null) {
+          throw new Error("WORD_ASSIGNMENT_CONFLICT");
+        }
+
+        // Update using the unique ID only.
+        await tx.wordListItem.update({
+          where: { id: item.id },
           data: {
             lessonId: createdLesson.id,
             lessonOrder: index + 1,
           },
         });
+
+        console.log("WORD ASSIGNED:", item.word.word);
+      }
+
+      const assignedCount = await tx.wordListItem.count({
+        where: {
+          lessonId: createdLesson.id,
+        },
+      });
+
+      if (assignedCount !== WORDS_PER_LESSON) {
+        throw new Error("WORD_ASSIGNMENT_FAILED");
       }
 
       return {
         ...createdLesson,
         assignedWords: availableItems.map((item) => item.word.word),
+        assignedCount,
       };
     });
 
@@ -159,6 +224,15 @@ export async function POST(request: NextRequest) {
               "Some words were assigned by another request. Please try again.",
           },
           { status: 409 },
+        );
+      }
+      if (
+        error instanceof Error &&
+        error.message === "WORD_ASSIGNMENT_FAILED"
+      ) {
+        return NextResponse.json(
+          { message: "Lesson was created, but word assignment failed." },
+          { status: 500 },
         );
       }
     }

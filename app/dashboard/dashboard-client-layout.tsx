@@ -4,16 +4,32 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import {
+  FiGrid,
+  FiBookOpen,
+  FiRefreshCw,
+} from "react-icons/fi";
+
 import { auth } from "@/lib/firebase";
 import DashboardSidebar from "@/components/dashbaord/dashboard-sidebar";
-import { requirePageRole } from "@/lib/server-auth";
 
+const dashboardLinks = [
+  {
+    label: "Overview",
+    href: "/dashboard",
+    icon: FiGrid,
+  },
+  {
+    label: "My Lessons",
+    href: "/dashboard/lessons",
+    icon: FiBookOpen,
+  },
+];
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);
@@ -51,17 +67,15 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-[#f8f8fa] text-zinc-900">
-      {/* Sidebar */}
       <DashboardSidebar
         user={user}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onLogout={handleLogout}
+        links={dashboardLinks}
       />
 
-      {/* Main area */}
       <div className="min-h-screen lg:pl-[248px]">
-        {/* Topbar */}
         <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-zinc-200/70 bg-white/90 px-5 backdrop-blur-xl sm:px-8">
           <div className="flex items-center gap-3">
             <button
@@ -82,9 +96,9 @@ export default function DashboardLayout({
             </button>
 
             <div>
-              <p className="text-sm font-semibold">Dashboard</p>
+              <p className="text-sm font-semibold">My Learning</p>
               <p className="hidden text-xs text-zinc-400 sm:block">
-                Your personal space
+                Your personal learning space
               </p>
             </div>
           </div>
@@ -97,7 +111,6 @@ export default function DashboardLayout({
           />
         </header>
 
-        {/* Page content changes here */}
         <main className="mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 sm:py-12 lg:px-10">
           {children}
         </main>

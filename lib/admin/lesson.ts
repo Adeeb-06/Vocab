@@ -9,6 +9,7 @@ export type LessonOptionsResponse = {
   wordLists: LessonWordListOption[];
 };
 
+
 async function parseResponse<T>(response: Response): Promise<T> {
   const data = await response.json();
 
@@ -30,6 +31,7 @@ export async function fetchLessonOptions(): Promise<LessonOptionsResponse> {
 
 export type CreateLessonPayload = {
   wordListId: string;
+  title:string;
 };
 
 export async function createLesson(payload: CreateLessonPayload) {

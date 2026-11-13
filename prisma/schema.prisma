@@ -18,11 +18,6 @@ enum LessonStatus {
   PUBLISHED
 }
 
-enum ProgramStatus {
-  ACTIVE
-  COMPLETED
-  PAUSED
-}
 
 enum LessonProgressStatus {
   NOT_STARTED
@@ -49,9 +44,10 @@ model User {
   role        UserRole @default(user)
 
   // Learning relations
-  programs       UserProgram[]
+
   lessonProgress UserLessonProgress[]
   wordProgress   UserWordProgress[]
+   answerAttempts UserAnswerAttempt[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -80,6 +76,7 @@ model Word {
   listItems    WordListItem[]
   clozes       WordCloze[]
   userProgress UserWordProgress[]
+   answerAttempts UserAnswerAttempt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -135,7 +132,7 @@ model WordList {
 
   items    WordListItem[]
   lessons  Lesson[]
-  programs UserProgram[]
+
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -158,6 +155,7 @@ model Lesson {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+   answerAttempts UserAnswerAttempt[]
 
   @@unique([wordListId, lessonNumber])
   @@index([wordListId, status, releaseAt])
@@ -190,30 +188,11 @@ model WordListItem {
   @@index([lessonId])
 }
 
-model UserProgram {
-  id         String        @id @default(auto()) @map("_id") @db.ObjectId
-  userId     String        @db.ObjectId
-  wordListId String        @db.ObjectId
-
-  status      ProgramStatus @default(ACTIVE)
-  startedAt   DateTime      @default(now())
-  completedAt DateTime?
-
-  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wordList WordList              @relation(fields: [wordListId], references: [id], onDelete: Cascade)
-  lessons  UserLessonProgress[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, wordListId])
-  @@index([userId, status])
-}
 
 model UserLessonProgress {
   id        String               @id @default(auto()) @map("_id") @db.ObjectId
   userId    String               @db.ObjectId
-  programId String               @db.ObjectId
+
   lessonId  String               @db.ObjectId
 
   status      LessonProgressStatus @default(NOT_STARTED)
@@ -222,26 +201,49 @@ model UserLessonProgress {
   completedAt DateTime?
 
   user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  program UserProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
   lesson  Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([userId, lessonId])
-  @@index([programId, status])
+
 }
 
-model UserWordProgress {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId
-  userId String @db.ObjectId
-  wordId String @db.ObjectId
 
-  box           Int      @default(1)
-  nextReviewAt  DateTime
-  introducedAt  DateTime @default(now())
+model UserAnswerAttempt {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  lessonId     String   @db.ObjectId
+  wordId       String   @db.ObjectId
+  clozeId      String?  @db.ObjectId
+
+  questionType String
+  answerText   String
+  isCorrect    Boolean
+  answeredAt   DateTime @default(now())
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  word   Word       @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  cloze  WordCloze? @relation(fields: [clozeId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lessonId, answeredAt])
+  @@index([userId, wordId, answeredAt])
+  @@index([clozeId])
+  @@map("user_answer_attempts")
+}
+
+  model UserWordProgress {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  userId  String @db.ObjectId
+  wordId  String @db.ObjectId
+
+  box            Int      @default(1)
+  nextReviewAt   DateTime
+  introducedAt   DateTime @default(now())
   lastReviewedAt DateTime?
-  lapses        Int      @default(0)
+  lapses         Int      @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
@@ -253,6 +255,7 @@ model UserWordProgress {
   @@index([userId, nextReviewAt])
   @@index([wordId])
 }
+
 
 model WordCloze {
   id String @id @default(auto()) @map("_id") @db.ObjectId
@@ -282,6 +285,7 @@ model WordCloze {
   // Content management
   isVerified Boolean @default(false)
   isActive   Boolean @default(true)
+   answerAttempts UserAnswerAttempt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -292,3 +296,5 @@ model WordCloze {
   @@index([pattern, isActive, isVerified])
   @@index([senseId, pattern])
 }
+
+

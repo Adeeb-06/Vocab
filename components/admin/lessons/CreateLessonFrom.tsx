@@ -1,24 +1,17 @@
-
 "use client";
 
 import { useState } from "react";
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, Layers, Loader2 } from "lucide-react";
 
-import {
-  createLesson,
-  fetchLessonOptions,
-} from "@/lib/admin/lesson";
+import { createLesson, fetchLessonOptions } from "@/lib/admin/lesson";
 
 export default function CreateLessonForm() {
   const queryClient = useQueryClient();
 
   const [wordListId, setWordListId] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [title, setTitle] = useState("");
 
   const {
     data: options,
@@ -33,9 +26,7 @@ export default function CreateLessonForm() {
 
   const wordLists = options?.wordLists ?? [];
 
-  const selectedList = wordLists.find(
-    (list) => list.id === wordListId
-  );
+  const selectedList = wordLists.find((list) => list.id === wordListId);
 
   const createMutation = useMutation({
     mutationFn: createLesson,
@@ -57,12 +48,13 @@ export default function CreateLessonForm() {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!wordListId || createMutation.isPending) return;
+    if (!wordListId || !title.trim() || createMutation.isPending) return;
 
     setSuccessMessage("");
 
     createMutation.mutate({
       wordListId,
+      title: title.trim(),
     });
   }
 
@@ -102,9 +94,7 @@ export default function CreateLessonForm() {
           </div>
 
           <div>
-            <h2 className="font-semibold text-gray-900">
-              Select a word list
-            </h2>
+            <h2 className="font-semibold text-gray-900">Select a word list</h2>
             <p className="text-sm text-gray-500">
               Choose the source for this lesson.
             </p>
@@ -144,9 +134,7 @@ export default function CreateLessonForm() {
           </div>
 
           <div>
-            <h2 className="font-semibold text-gray-900">
-              Lesson preview
-            </h2>
+            <h2 className="font-semibold text-gray-900">Lesson preview</h2>
             <p className="text-sm text-gray-500">
               Lesson details are generated automatically.
             </p>
@@ -155,25 +143,43 @@ export default function CreateLessonForm() {
 
         {selectedList ? (
           <div className="rounded-lg bg-gray-50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Lesson name
-            </p>
+            <div>
+              <label
+                htmlFor="lesson-title"
+                className="text-xs font-medium uppercase tracking-wide text-gray-500"
+              >
+                Lesson name
+              </label>
 
-            <h3 className="mt-1 text-xl font-semibold text-gray-900">
-              Lesson {selectedList.nextLessonNumber}
-            </h3>
+              <input
+                id="lesson-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Academic Vocabulary – Set 1"
+                maxLength={80}
+                required
+                disabled={createMutation.isPending}
+                className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-gray-500"
+              />
+            </div>
 
             <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3 text-sm">
-              <span className="text-gray-500">Words per lesson</span>
+              <span className="text-gray-500">Lesson number</span>
               <span className="font-semibold text-gray-900">
-                15 words
+                {selectedList.nextLessonNumber}
               </span>
             </div>
 
+            <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3 text-sm">
+              <span className="text-gray-500">Words per lesson</span>
+              <span className="font-semibold text-gray-900">15 words</span>
+            </div>
+
             <p className="mt-3 text-xs leading-5 text-gray-500">
-              The next 15 available verified and active words will
-              automatically be assigned in their existing word-list order.
-              Already assigned words will be skipped.
+              The next 15 available verified and active words will automatically
+              be assigned in their existing word-list order. Already assigned
+              words will be skipped.
             </p>
           </div>
         ) : (
@@ -203,6 +209,7 @@ export default function CreateLessonForm() {
         type="submit"
         disabled={
           !wordListId ||
+          !title.trim() ||
           createMutation.isPending ||
           wordLists.length === 0
         }
