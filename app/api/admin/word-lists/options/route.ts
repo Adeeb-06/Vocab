@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const params = request.nextUrl.searchParams;
+    const difficulty = params.get("difficulty") || "all";
 
     const search = params.get("search")?.trim() ?? "";
     const page = Math.max(1, Number(params.get("page")) || 1);
@@ -32,8 +33,12 @@ export async function GET(request: NextRequest) {
             },
           }
         : {}),
+      ...(["0", "1", "2"].includes(difficulty)
+        ? {
+            difficulty: Number(difficulty),
+          }
+        : {}),
     };
-
     const [words, total] = await Promise.all([
       prisma.word.findMany({
         where,

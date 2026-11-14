@@ -21,6 +21,7 @@ export default function VerifiedWordPicker({
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [difficulty, setDifficulty] = useState("all");
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -31,19 +32,18 @@ export default function VerifiedWordPicker({
     return () => clearTimeout(timeout);
   }, [searchInput]);
 
-  const {
-    data,
-    isPending,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["admin-verified-words", page, search],
-    queryFn: () => fetchVerifiedWords({ page, search }),
-    placeholderData: keepPreviousData,
-  });
-
+const {
+  data,
+  isPending,
+  isFetching,
+  isError,
+  error,
+  refetch,
+} = useQuery({
+  queryKey: ["admin-verified-words", page, search, difficulty],
+  queryFn: () => fetchVerifiedWords({ page, search, difficulty }),
+  placeholderData: keepPreviousData,
+});
   const words = data?.words ?? [];
   const pagination = data?.pagination;
 
@@ -70,6 +70,19 @@ export default function VerifiedWordPicker({
           placeholder="Search vocabulary..."
           className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-500"
         />
+        <select
+  value={difficulty}
+  onChange={(e) => {
+    setDifficulty(e.target.value);
+    setPage(1);
+  }}
+  className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-500"
+>
+  <option value="all">All difficulty levels</option>
+  <option value="0">Level 0</option>
+  <option value="1">Level 1</option>
+  <option value="2">Level 2</option>
+</select>
 
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span>{pagination?.total ?? 0} verified words</span>
@@ -138,11 +151,11 @@ export default function VerifiedWordPicker({
                   </p>
                 </div>
 
-                {word.difficulty && (
-                  <span className="shrink-0 text-xs text-gray-400">
-                    Level {word.difficulty}
-                  </span>
-                )}
+              {word.difficulty !== null && (
+  <span className="shrink-0 text-xs text-gray-400">
+    Level {word.difficulty}
+  </span>
+)}
               </label>
             );
           })}

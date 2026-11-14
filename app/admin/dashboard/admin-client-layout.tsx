@@ -82,7 +82,7 @@ export default function AdminClientLayout({
   },
   {
     label: "Word Lists",
-    href: "/admin/dashboard/word-lists/create",
+    href: "/admin/dashboard/word-lists",
     icon: FiLayers,
   },
   {
