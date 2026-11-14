@@ -1,0 +1,1 @@
+npx tsx scripts/generate-word-audio.ts --word benevolent

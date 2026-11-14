@@ -37,6 +37,7 @@ type Filters = {
   search: string;
   verification: string;
   active: string;
+  difficulty: string;
   pageSize: number;
 };
 
@@ -50,6 +51,7 @@ async function fetchWords(
     search: filters.search,
     verification: filters.verification,
     active: filters.active,
+    difficulty: filters.difficulty,
   });
 
   const response = await fetch(`/api/admin/words?${params}`);
@@ -75,6 +77,45 @@ async function updateVerification(wordId: string, isVerified: boolean) {
   }
 
   return response.json();
+}
+
+async function bulkUpdateWords(payload: {
+  wordIds: string[];
+  difficulty?: number;
+  isVerified?: boolean;
+}) {
+  const response = await fetch("/api/admin/words", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Bulk update failed.");
+  }
+
+  return data;
+}
+async function updateDifficulty(wordId: string, difficulty: number | null) {
+  const response = await fetch("/api/admin/words", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ wordId, difficulty }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Could not update difficulty.");
+  }
+
+  return data;
 }
 
 async function updateWordMeaning({
@@ -113,6 +154,12 @@ async function updateWordMeaning({
 export default function WordsTable() {
   const queryClient = useQueryClient();
   const [copiedWordId, setCopiedWordId] = useState<string | null>(null);
+  const [difficultyValues, setDifficultyValues] = useState<
+    Record<string, string>
+  >({});
+
+  const [selectedWordIds, setSelectedWordIds] = useState<string[]>([]);
+  const [bulkDifficulty, setBulkDifficulty] = useState("");
 
   const [editing, setEditing] = useState<{
     word: Word;
@@ -137,6 +184,7 @@ export default function WordsTable() {
     verification: "all",
     active: "all",
     pageSize: 10,
+    difficulty:"all"
   });
 
   const [searchInput, setSearchInput] = useState("");
@@ -205,16 +253,56 @@ export default function WordsTable() {
     },
   });
 
-  const updateFilter = (
-    key: "verification" | "active" | "pageSize",
-    value: string,
-  ) => {
-    setFilters((current) => ({
-      ...current,
-      [key]: key === "pageSize" ? Number(value) : value,
-    }));
-    setPage(1);
-  };
+  const bulkMutation = useMutation({
+    mutationFn: bulkUpdateWords,
+
+    onSuccess: (data) => {
+      setSelectedWordIds([]);
+      setBulkDifficulty("");
+
+      queryClient.invalidateQueries({
+        queryKey: ["admin-words"],
+      });
+
+      console.log(`Updated ${data.updatedCount} words.`);
+    },
+  });
+
+  const difficultyMutation = useMutation({
+    mutationFn: ({
+      wordId,
+      difficulty,
+    }: {
+      wordId: string;
+      difficulty: number | null;
+    }) => updateDifficulty(wordId, difficulty),
+
+    onSuccess: (_data, variables) => {
+      setDifficultyValues((current) => {
+        const updated = { ...current };
+        delete updated[variables.wordId];
+        return updated;
+      });
+    },
+
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["admin-words"],
+      });
+    },
+  });
+
+ const updateFilter = (
+  key: "verification" | "active" | "difficulty" | "pageSize",
+  value: string
+) => {
+  setFilters((current) => ({
+    ...current,
+    [key]: key === "pageSize" ? Number(value) : value,
+  }));
+
+  setPage(1);
+};
 
   async function handleCopyWord(word: Word) {
     const text = `${word.word} english and bangla meaning`;
@@ -233,6 +321,30 @@ export default function WordsTable() {
 
   const pagination = data?.pagination;
   const words = data?.words ?? [];
+
+  const currentPageIds = words.map((word) => word.id);
+
+  const allPageSelected =
+    currentPageIds.length > 0 &&
+    currentPageIds.every((id) => selectedWordIds.includes(id));
+
+  function toggleWordSelection(wordId: string) {
+    setSelectedWordIds((current) =>
+      current.includes(wordId)
+        ? current.filter((id) => id !== wordId)
+        : [...current, wordId],
+    );
+  }
+
+  function togglePageSelection() {
+    setSelectedWordIds((current) => {
+      if (allPageSelected) {
+        return current.filter((id) => !currentPageIds.includes(id));
+      }
+
+      return [...new Set([...current, ...currentPageIds])];
+    });
+  }
 
   return (
     <div className="space-y-5">
@@ -267,6 +379,16 @@ export default function WordsTable() {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
+        <select
+  value={filters.difficulty}
+  onChange={(e) => updateFilter("difficulty", e.target.value)}
+  className="rounded-lg border bg-white px-3 py-2.5 text-sm outline-none"
+>
+  <option value="all">All difficulties</option>
+  <option value="0">Level 0</option>
+  <option value="1">Level 1</option>
+  <option value="2">Level 2</option>
+</select>
 
         <select
           value={filters.pageSize}
@@ -281,6 +403,104 @@ export default function WordsTable() {
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border bg-white">
+        {/* Bulk Actions */}
+        <div className="mb-4 rounded-xl border bg-white p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">
+                Bulk actions
+              </p>
+              <p className="text-xs text-gray-500">
+                {selectedWordIds.length} words selected
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedWordIds([])}
+              disabled={selectedWordIds.length === 0}
+              className="text-xs font-medium text-gray-500 hover:text-red-600 disabled:opacity-40"
+            >
+              Clear selection
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Bulk difficulty */}
+            <input
+              type="number"
+              step="1"
+              value={bulkDifficulty}
+              onChange={(e) => setBulkDifficulty(e.target.value)}
+              placeholder="Difficulty number"
+              className="w-36 rounded-lg border px-3 py-2 text-sm outline-none focus:border-gray-500"
+            />
+
+            <button
+              type="button"
+              disabled={
+                selectedWordIds.length === 0 ||
+                bulkDifficulty.trim() === "" ||
+                !Number.isInteger(Number(bulkDifficulty)) ||
+                bulkMutation.isPending
+              }
+              onClick={() =>
+                bulkMutation.mutate({
+                  wordIds: selectedWordIds,
+                  difficulty: Number(bulkDifficulty),
+                })
+              }
+              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Update difficulty
+            </button>
+
+            <div className="hidden h-7 border-l sm:block" />
+
+            {/* Bulk verification */}
+            <button
+              type="button"
+              disabled={selectedWordIds.length === 0 || bulkMutation.isPending}
+              onClick={() =>
+                bulkMutation.mutate({
+                  wordIds: selectedWordIds,
+                  isVerified: true,
+                })
+              }
+              className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100 disabled:opacity-40"
+            >
+              Verify selected
+            </button>
+
+            <button
+              type="button"
+              disabled={selectedWordIds.length === 0 || bulkMutation.isPending}
+              onClick={() =>
+                bulkMutation.mutate({
+                  wordIds: selectedWordIds,
+                  isVerified: false,
+                })
+              }
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            >
+              Unverify selected
+            </button>
+          </div>
+
+          {bulkMutation.isPending && (
+            <p className="text-xs text-gray-500">Updating selected words...</p>
+          )}
+
+          {bulkMutation.isError && (
+            <p className="text-xs text-red-600">{bulkMutation.error.message}</p>
+          )}
+
+          {bulkMutation.isSuccess && (
+            <p className="text-xs text-green-600">
+              Successfully updated {bulkMutation.data.updatedCount} words.
+            </p>
+          )}
+        </div>
         <div className="flex items-center justify-between border-b px-5 py-4">
           <div>
             <h2 className="font-semibold text-gray-900">All words</h2>
@@ -323,6 +543,16 @@ export default function WordsTable() {
             <table className="w-full min-w-[850px] text-left text-sm">
               <thead className="border-b bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
+                  <th className="w-12 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={togglePageSelection}
+                      className="h-4 w-4 cursor-pointer rounded accent-gray-900"
+                      title="Select all words on this page"
+                    />
+                  </th>
+
                   <th className="px-5 py-3 font-medium">Word</th>
                   <th className="px-5 py-3 font-medium">Meaning</th>
                   <th className="px-5 py-3 font-medium">Difficulty</th>
@@ -338,8 +568,22 @@ export default function WordsTable() {
                   const sense = word.senses[0];
 
                   return (
-                    <tr key={word.id} className="transition hover:bg-gray-50">
-                      <td className="px-5 py-4">
+                  <tr
+  key={word.id}
+  className={`transition hover:bg-gray-50 ${
+    selectedWordIds.includes(word.id) ? "bg-blue-50/50" : ""
+  }`}
+>
+  <td className="px-4 py-4">
+    <input
+      type="checkbox"
+      checked={selectedWordIds.includes(word.id)}
+      onChange={() => toggleWordSelection(word.id)}
+      className="h-4 w-4 cursor-pointer rounded accent-gray-900"
+    />
+  </td>
+
+  <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-gray-900">
                             {word.word}
@@ -382,10 +626,59 @@ export default function WordsTable() {
                         )}
                       </td>
 
-                      <td className="px-5 py-4 text-gray-600">
-                        {word.difficulty ?? "—"}
-                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            step="1"
+                            value={
+                              difficultyValues[word.id] ??
+                              (word.difficulty !== null
+                                ? String(word.difficulty)
+                                : "")
+                            }
+                            onChange={(e) =>
+                              setDifficultyValues((current) => ({
+                                ...current,
+                                [word.id]: e.target.value,
+                              }))
+                            }
+                            className="w-20 rounded-lg border px-2 py-1.5 text-sm outline-none focus:border-gray-500"
+                            placeholder="—"
+                          />
 
+                          <button
+                            type="button"
+                            disabled={
+                              difficultyMutation.isPending ||
+                              difficultyValues[word.id] === undefined
+                            }
+                            onClick={() => {
+                              const value = difficultyValues[word.id];
+
+                              if (value === undefined) return;
+
+                              const difficulty =
+                                value.trim() === "" ? null : Number(value);
+
+                              if (
+                                difficulty !== null &&
+                                !Number.isInteger(difficulty)
+                              ) {
+                                return;
+                              }
+
+                              difficultyMutation.mutate({
+                                wordId: word.id,
+                                difficulty,
+                              });
+                            }}
+                            className="rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </td>
                       <td className="px-5 py-4">
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
